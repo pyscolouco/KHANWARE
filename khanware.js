@@ -1,252 +1,365 @@
-const ver = "V3.0.3";
+const KW_VERSION = "4.1.0";
+const USER = { username: "Aluno", UID: Date.now() % 1000000 };
 
-let device = {
-    mobile: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Windows Phone|Mobile|Tablet|Kindle|Silk|PlayBook|BB10/i.test(navigator.userAgent),
-    apple: /iPhone|iPad|iPod|Macintosh|Mac OS X/i.test(navigator.userAgent)
-};
-
-/* User */
-let user = {
-    username: "Username",
-    nickname: "Nickname",
-    UID: 0
-}
-
-let loadedPlugins = [];
-
-/* Elements */
-const unloader = document.createElement('div');
-const dropdownMenu = document.createElement('div');
-const watermark = document.createElement('div');
-const statsPanel = document.createElement('div');
-const splashScreen = document.createElement('div');
-
-/* Globals */
-window.features = {
-    questionSpoof: true,
-    videoSpoof: true,
+/* Configurações Globais */
+const SETTINGS = {
+    autoComplete: false,
+    darkMode: false,
     showAnswers: false,
-    autoAnswer: false,
-    customBanner: false,
-    nextRecommendation: false,
-    repeatQuestion: false,
-    minuteFarmer: false,
-    rgbLogo: false
+    autoAnswer: true,
+    answerDelay: 0,
+    customStyle: true,
+    mobileMenuOpen: false
 };
 
-window.featureConfigs = {
-    autoAnswerDelay: 3,
-    customUsername: "",
-    customPfp: ""
-};
+/* Elementos da UI */
+const KW_UI = {
+    menu: document.createElement('div'),
+    toggle: document.createElement('div'),
+    mobileMenu: document.createElement('div'),
+    status: document.createElement('div'),
+    init() {
+        this.createMainMenu();
+        this.createMobileMenu();
+        this.createStatus();
+        this.applyStyles();
+        this.bindEvents();
+    },
 
-/* Security */
-document.addEventListener('contextmenu', e => e.preventDefault());
-document.addEventListener('keydown', e => {
-    if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && ['I','C','J'].includes(e.key))) e.preventDefault();
-});
-
-/* Styles */
-document.head.appendChild(Object.assign(document.createElement("style"),{
-    innerHTML: `@font-face{font-family:'MuseoSans';src:url('https://r2.e-z.host/4d0a0bea-60f8-44d6-9e74-3032a64a9f32/ynddewua.ttf')format('truetype')}`
-}));
-
-document.head.appendChild(Object.assign(document.createElement('style'),{
-    innerHTML: `::-webkit-scrollbar{width:8px}::-webkit-scrollbar-track{background:#f1f1f1}::-webkit-scrollbar-thumb{background:#888;border-radius:10px}::-webkit-scrollbar-thumb:hover{background:#555}`
-}));
-
-document.querySelector("link[rel~='icon']").href = 'https://r2.e-z.host/4d0a0bea-60f8-44d6-9e74-3032a64a9f32/ukh0rq22.png';
-
-/* Event System */
-class EventEmitter {
-    constructor() { this.events = {}; }
-    on(event, callback) {
-        this.events[event] = this.events[event] || [];
-        this.events[event].push(callback);
-    }
-    emit(event, ...args) {
-        (this.events[event] || []).forEach(callback => callback(...args));
-    }
-}
-
-const plppdo = new EventEmitter();
-new MutationObserver(mutations => {
-    mutations.some(m => m.type === 'childList') && plppdo.emit('domChanged');
-}).observe(document.body, { childList: true, subtree: true });
-
-/* Utilities */
-const utilities = {
-    delay: ms => new Promise(r => setTimeout(r, ms)),
-    playSound: url => new Audio(url).play().catch(console.error),
-    toast: (text, duration = 3000) => {
-        Toastify({ text, duration, gravity: 'bottom', position: 'center',
-            style: { background: 'rgba(0,0,0,0.9)', borderRadius: '8px' }
-        }).showToast();
-    }
-};
-
-/* Menu System */
-function setupMenu() {
-    const setFeature = (path, value) => {
-        const parts = path.split('.');
-        let obj = window;
-        while(parts.length > 1) obj = obj[parts.shift()];
-        obj[parts[0]] = value;
-    };
-
-    function createFeatureElement(attr) {
-        const element = document.createElement(attr.type === 'nonInput' ? 'label' : 'input');
-        if(attr.type !== 'nonInput') element.type = attr.type;
-        
-        if(attr.attributes) {
-            attr.attributes.split(' ').forEach(a => {
-                const [key, value] = a.split('=');
-                element.setAttribute(key, value ? value.replace(/"/g, '') : '');
-            });
-        }
-        
-        if(attr.variable) element.setAttribute('data-setting', attr.variable);
-        if(attr.className) element.classList.add(attr.className);
-        
-        return element;
-    }
-
-    function setupWatermark() {
-        Object.assign(watermark.style, {
+    createMainMenu() {
+        Object.assign(this.menu.style, {
             position: 'fixed',
-            top: '10px',
-            right: '10px',
-            background: 'rgba(0,0,0,0.9)',
+            top: '60px',
+            right: '20px',
+            background: 'rgba(0,0,0,0.95)',
+            borderRadius: '12px',
+            padding: '15px',
+            width: '250px',
+            display: 'none',
+            backdropFilter: 'blur(8px)',
+            zIndex: 9999,
+            color: '#fff',
+            fontFamily: 'Arial, sans-serif',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+        });
+
+        this.menu.innerHTML = `
+            <div style="margin-bottom:15px;font-size:1.2em;border-bottom:1px solid #333;padding-bottom:8px">
+                🛠️ Configurações KHANWARE
+            </div>
+            ${this.generateMenuItems()}
+            <div style="margin-top:15px;font-size:0.8em;color:#888">
+                <div>👤 ${USER.username}</div>
+                <div>🆔 UID: ${USER.UID}</div>
+                <div>🚀 Versão: ${KW_VERSION}</div>
+            </div>
+        `;
+        document.body.appendChild(this.menu);
+    },
+
+    generateMenuItems() {
+        const features = [
+            { icon: '📝', label: 'Auto-Completar', key: 'F1', setting: 'autoComplete' },
+            { icon: '🤖', label: 'Auto-Resposta', key: 'F2', setting: 'autoAnswer' },
+            { icon: '👁️', label: 'Mostrar Respostas', key: 'F3', setting: 'showAnswers' },
+            { icon: '🌙', label: 'Modo Escuro', key: 'F4', setting: 'darkMode' },
+            { icon: '⚡', label: 'Delay Respostas', key: 'F5', type: 'range', setting: 'answerDelay', min: 0, max: 5 }
+        ];
+
+        return features.map(item => `
+            <div class="menu-item" data-setting="${item.setting}" 
+                 style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.1);cursor:pointer">
+                <div style="display:flex;align-items:center;gap:12px">
+                    <span style="font-size:1.1em">${item.icon}</span>
+                    <div style="flex-grow:1">
+                        <div>${item.label}</div>
+                        ${item.type === 'range' ? `
+                            <input type="range" min="${item.min}" max="${item.max}" 
+                                   value="${SETTINGS[item.setting]}" 
+                                   style="width:100%;margin-top:4px">
+                        ` : `
+                            <div style="font-size:0.8em;color:#888">Atalho: ${item.key}</div>
+                        `}
+                    </div>
+                    ${item.type !== 'range' ? `
+                        <label class="switch">
+                            <input type="checkbox" ${SETTINGS[item.setting] ? 'checked' : ''}>
+                            <span class="slider"></span>
+                        </label>
+                    ` : ''}
+                </div>
+            </div>
+        `).join('');
+    },
+
+    createMobileMenu() {
+        Object.assign(this.mobileMenu.style, {
+            position: 'fixed',
+            bottom: '-100%',
+            left: '0',
+            right: '0',
+            background: 'rgba(0,0,0,0.95)',
+            padding: '20px',
+            borderTopLeftRadius: '20px',
+            borderTopRightRadius: '20px',
+            transition: 'bottom 0.3s ease',
+            zIndex: 10000,
+            backdropFilter: 'blur(10px)'
+        });
+
+        this.mobileMenu.innerHTML = `
+            <div style="text-align:center;margin-bottom:15px;font-size:1.2em">
+                🛠️ Menu KHANWARE
+            </div>
+            ${this.generateMobileItems()}
+        `;
+        document.body.appendChild(this.mobileMenu);
+    },
+
+    generateMobileItems() {
+        const features = [
+            { icon: '📝', label: 'Auto-Completar', setting: 'autoComplete' },
+            { icon: '🤖', label: 'Auto-Resposta', setting: 'autoAnswer' },
+            { icon: '👁️', label: 'Mostrar Respostas', setting: 'showAnswers' },
+            { icon: '🌙', label: 'Modo Escuro', setting: 'darkMode' }
+        ];
+
+        return features.map(item => `
+            <div class="mobile-item" data-setting="${item.setting}" 
+                 style="padding:15px;background:rgba(255,255,255,0.1);border-radius:12px;margin-bottom:10px">
+                <div style="display:flex;align-items:center;gap:15px">
+                    <span style="font-size:1.3em">${item.icon}</span>
+                    <div style="flex-grow:1;font-size:1.1em">${item.label}</div>
+                    <label class="switch">
+                        <input type="checkbox" ${SETTINGS[item.setting] ? 'checked' : ''}>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+        `).join('');
+    },
+
+    createStatus() {
+        Object.assign(this.status.style, {
+            position: 'fixed',
+            bottom: '20px',
+            left: '20px',
+            background: 'rgba(0,0,0,0.7)',
             color: '#fff',
             padding: '8px 15px',
             borderRadius: '20px',
-            fontFamily: 'MuseoSans, sans-serif',
-            fontSize: '14px',
-            cursor: 'move',
-            userSelect: 'none',
-            zIndex: '1001',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
+            fontSize: '0.9em',
+            backdropFilter: 'blur(4px)',
+            zIndex: 9999
         });
-        
-        watermark.innerHTML = `
-            <span style="font-weight:bold">KHANWARE</span>
-            <span style="color:#aaa; margin-left:8px">v${ver}</span>
+
+        const updateStatus = () => {
+            const time = new Date().toLocaleTimeString();
+            this.status.innerHTML = `🕒 ${time} | ✅ Atividades: ${document.querySelectorAll('.practice-question').length}`;
+        };
+
+        setInterval(updateStatus, 1000);
+        updateStatus();
+        document.body.appendChild(this.status);
+    },
+
+    applyStyles() {
+        const style = document.createElement('style');
+        style.innerHTML = `
+            .switch {
+                position: relative;
+                display: inline-block;
+                width: 40px;
+                height: 20px;
+            }
+
+            .switch input {
+                opacity: 0;
+                width: 0;
+                height: 0;
+            }
+
+            .slider {
+                position: absolute;
+                cursor: pointer;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background-color: #666;
+                transition: .3s;
+                border-radius: 20px;
+            }
+
+            .slider:before {
+                content: "";
+                position: absolute;
+                height: 16px;
+                width: 16px;
+                left: 2px;
+                bottom: 2px;
+                background-color: white;
+                transition: .3s;
+                border-radius: 50%;
+            }
+
+            input:checked + .slider {
+                background-color: #72ff72;
+            }
+
+            input:checked + .slider:before {
+                transform: translateX(20px);
+            }
+
+            @media (max-width: 768px) {
+                .menu-item {
+                    padding: 12px 0 !important;
+                }
+            }
         `;
-        
-        document.body.appendChild(watermark);
-        
-        let isDragging = false, offsetX, offsetY;
-        watermark.addEventListener('mousedown', e => {
-            isDragging = true;
-            offsetX = e.clientX - watermark.offsetLeft;
-            offsetY = e.clientY - watermark.offsetTop;
+        document.head.appendChild(style);
+    },
+
+    bindEvents() {
+        // Alternar menus
+        document.addEventListener('click', (e) => {
+            if(e.target.closest('.menu-toggle')) {
+                if(device.mobile) {
+                    this.toggleMobileMenu();
+                } else {
+                    this.menu.style.display = this.menu.style.display === 'block' ? 'none' : 'block';
+                }
+            }
         });
-        
-        document.addEventListener('mouseup', () => isDragging = false);
-        document.addEventListener('mousemove', e => {
-            if(isDragging) {
-                watermark.style.left = `${Math.max(0, Math.min(e.clientX - offsetX, window.innerWidth - watermark.offsetWidth))}px`;
-                watermark.style.top = `${Math.max(0, Math.min(e.clientY - offsetY, window.innerHeight - watermark.offsetHeight))}px`;
+
+        // Fechar menu ao clicar fora
+        document.addEventListener('click', (e) => {
+            if(!e.target.closest('.menu') && !e.target.closest('.menu-toggle')) {
+                this.menu.style.display = 'none';
+                if(device.mobile) this.closeMobileMenu();
+            }
+        });
+
+        // Eventos de configuração
+        document.querySelectorAll('.menu-item input, .mobile-item input').forEach(input => {
+            input.addEventListener('change', (e) => {
+                const setting = e.target.closest('[data-setting]').dataset.setting;
+                SETTINGS[setting] = e.target.checked;
+                this.updateFeature(setting, e.target.checked);
+            });
+        });
+
+        // Eventos de range
+        document.querySelectorAll('input[type="range"]').forEach(input => {
+            input.addEventListener('input', (e) => {
+                SETTINGS.answerDelay = e.target.value;
+            });
+        });
+    },
+
+    toggleMobileMenu() {
+        SETTINGS.mobileMenuOpen = !SETTINGS.mobileMenuOpen;
+        this.mobileMenu.style.bottom = SETTINGS.mobileMenuOpen ? '0' : '-100%';
+    },
+
+    closeMobileMenu() {
+        SETTINGS.mobileMenuOpen = false;
+        this.mobileMenu.style.bottom = '-100%';
+    },
+
+    updateFeature(setting, value) {
+        switch(setting) {
+            case 'darkMode':
+                document.body.style.backgroundColor = value ? '#1a1a1a' : '';
+                document.body.style.color = value ? '#fff' : '';
+                break;
+            case 'autoAnswer':
+                if(value) this.activateAutoAnswer();
+                break;
+        }
+    },
+
+    activateAutoAnswer() {
+        const answerQuestions = () => {
+            document.querySelectorAll('.perseus-radio-option, .perseus-checkbox').forEach(btn => {
+                if(!btn.dataset.answered) {
+                    btn.click();
+                    btn.dataset.answered = true;
+                }
+            });
+        };
+
+        if(SETTINGS.answerDelay > 0) {
+            setTimeout(answerQuestions, SETTINGS.answerDelay * 1000);
+        } else {
+            answerQuestions();
+        }
+    }
+};
+
+/* Sistema de Atalhos */
+const ShortcutManager = {
+    init() {
+        document.addEventListener('keydown', (e) => {
+            if(e.key === 'F1') this.toggleSetting('autoComplete');
+            if(e.key === 'F2') this.toggleSetting('autoAnswer');
+            if(e.key === 'F3') this.toggleSetting('showAnswers');
+            if(e.key === 'F4') this.toggleSetting('darkMode');
+        });
+    },
+
+    toggleSetting(setting) {
+        SETTINGS[setting] = !SETTINGS[setting];
+        document.querySelectorAll(`[data-setting="${setting}"] input`).forEach(input => {
+            input.checked = SETTINGS[setting];
+        });
+        KW_UI.updateFeature(setting, SETTINGS[setting]);
+    }
+};
+
+/* Sistema de Auto-Completar */
+const AutoCompleteSystem = {
+    init() {
+        document.addEventListener('keydown', (e) => {
+            if(e.key === 'F1' || (device.mobile && SETTINGS.autoComplete)) {
+                this.completeAllActivities();
+            }
+        });
+    },
+
+    completeAllActivities() {
+        document.querySelectorAll('.practice-question').forEach(question => {
+            const inputs = question.querySelectorAll('input, textarea');
+            inputs.forEach(input => {
+                input.value = 'Resposta Automática';
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+            });
+            
+            const submitBtn = question.querySelector('.submit-btn');
+            if(submitBtn) {
+                submitBtn.click();
+                question.style.opacity = '0.5';
             }
         });
     }
+};
 
-    function setupDropdown() {
-        Object.assign(dropdownMenu.style, {
-            position: 'fixed',
-            top: '50px',
-            right: '10px',
-            background: 'rgba(0,0,0,0.9)',
-            color: '#fff',
-            width: '200px',
-            borderRadius: '12px',
-            padding: '10px',
-            display: 'none',
-            zIndex: '1000',
-            backdropFilter: 'blur(4px)'
-        });
+/* Inicialização */
+KW_UI.init();
+ShortcutManager.init();
+AutoCompleteSystem.init();
 
-        const features = [
-            { type: 'checkbox', label: 'Question Spoof', variable: 'features.questionSpoof', checked: true },
-            { type: 'checkbox', label: 'Auto Answer', variable: 'features.autoAnswer' },
-            { type: 'checkbox', label: 'Show Answers', variable: 'features.showAnswers' },
-            { type: 'range', label: 'Answer Delay', variable: 'featureConfigs.autoAnswerDelay', min: 0, max: 5 },
-            { type: 'divider' },
-            { type: 'text', label: 'Custom Name', variable: 'featureConfigs.customUsername' },
-            { type: 'text', label: 'Custom Avatar', variable: 'featureConfigs.customPfp' }
-        ];
-
-        dropdownMenu.innerHTML = features.map(f => {
-            if(f.type === 'divider') return '<hr style="border-color:#333; margin:8px 0">';
-            
-            return `
-                <div class="menu-item" style="margin:6px 0">
-                    ${f.type !== 'checkbox' ? `<label>${f.label}</label>` : ''}
-                    ${createFeatureElement({
-                        type: f.type,
-                        attributes: `${f.checked ? 'checked' : ''} ${f.min ? `min="${f.min}"` : ''} ${f.max ? `max="${f.max}"` : ''}`,
-                        variable: f.variable
-                    }).outerHTML}
-                </div>
-            `;
-        }).join('');
-
-        document.body.appendChild(dropdownMenu);
-        
-        watermark.addEventListener('click', () => {
-            dropdownMenu.style.display = dropdownMenu.style.display === 'block' ? 'none' : 'block';
-        });
-    }
-
-    function setupEventHandlers() {
-        dropdownMenu.querySelectorAll('input').forEach(input => {
-            input.addEventListener('change', e => {
-                const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
-                setFeature(e.target.getAttribute('data-setting'), value);
-                utilities.playSound('https://r2.e-z.host/4d0a0bea-60f8-44d6-9e74-3032a64a9f32/5os0bypi.wav');
-            });
-        });
-    }
-
-    setupWatermark();
-    setupDropdown();
-    setupEventHandlers();
-}
-
-/* Main Functions */
-function setupMain() {
-    function instantAnswer() {
-        const answers = document.querySelectorAll('.perseus-radio-option, .perseus-checkbox');
-        if(answers.length > 0) {
-            answers[Math.floor(Math.random() * answers.length)].click();
-            utilities.toast('Resposta selecionada automaticamente!');
+/* Suporte Mobile */
+if(device.mobile) {
+    document.body.addEventListener('touchstart', (e) => {
+        if(e.touches.length === 3) {
+            KW_UI.toggleMobileMenu();
         }
-    }
-
-    function completeActivities() {
-        document.querySelectorAll('.practice-question').forEach(q => {
-            const inputs = q.querySelectorAll('input, textarea');
-            inputs.forEach(i => i.value = 'Resposta Automática');
-            
-            const submitBtn = q.querySelector('.submit-btn');
-            submitBtn && submitBtn.click();
-        });
-        utilities.toast('Atividades completadas!');
-    }
-
-    plppdo.on('domChanged', () => {
-        if(window.features.autoAnswer) instantAnswer();
-        if(window.featureConfigs.autoAnswerDelay === 0) completeActivities();
-    });
-
-    document.addEventListener('keydown', e => {
-        if(e.key === 'F1') completeActivities();
     });
 }
 
-/* Initialization */
-(async () => {
-    setupMenu();
-    setupMain();
-    utilities.toast('KHANWARE Carregado com Sucesso!', 2000);
-})();
+/* Feedback Inicial */
+KW_UI.status.innerHTML += `<div style="margin-top:5px;color:#72ff72">✅ Pronto! Use os atalhos F1-F5</div>`;
+setTimeout(() => {
+    KW_UI.status.querySelector('div').remove();
+}, 3000);
